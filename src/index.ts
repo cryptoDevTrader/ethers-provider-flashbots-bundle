@@ -234,12 +234,14 @@ export class FlashbotsBundleProvider extends providers.JsonRpcProvider {
   private genericProvider: BaseProvider
   private authSigner: Signer
   private connectionInfo: ConnectionInfo
+  private signatureHeader: string
 
-  constructor(genericProvider: BaseProvider, authSigner: Signer, connectionInfoOrUrl: ConnectionInfo, network: Networkish) {
+  constructor(genericProvider: BaseProvider, authSigner: Signer, connectionInfoOrUrl: ConnectionInfo, network: Networkish, signatureHeader: string) {
     super(connectionInfoOrUrl, network)
     this.genericProvider = genericProvider
     this.authSigner = authSigner
     this.connectionInfo = connectionInfoOrUrl
+    this.signatureHeader = signatureHeader
   }
 
   static async throttleCallback(): Promise<boolean> {
@@ -251,7 +253,8 @@ export class FlashbotsBundleProvider extends providers.JsonRpcProvider {
     genericProvider: BaseProvider,
     authSigner: Signer,
     connectionInfoOrUrl?: ConnectionInfo | string,
-    network?: Networkish
+    network?: Networkish,
+    signatureHeader?: string
   ): Promise<FlashbotsBundleProvider> {
     const connectionInfo: ConnectionInfo =
       typeof connectionInfoOrUrl === 'string' || typeof connectionInfoOrUrl === 'undefined'
@@ -262,7 +265,6 @@ export class FlashbotsBundleProvider extends providers.JsonRpcProvider {
             ...connectionInfoOrUrl
           }
     if (connectionInfo.headers === undefined) connectionInfo.headers = {}
-    if (connectionInfo.signatureHeader === undefined) connectionInfo.signatureHeader = 'X-Flashbots-Signature'
     connectionInfo.throttleCallback = FlashbotsBundleProvider.throttleCallback
     const networkish: Networkish = {
       chainId: 0,
@@ -281,7 +283,9 @@ export class FlashbotsBundleProvider extends providers.JsonRpcProvider {
       networkish.chainId = (await genericProvider.getNetwork()).chainId
     }
 
-    return new FlashbotsBundleProvider(genericProvider, authSigner, connectionInfo, networkish)
+    signatureHeader = signatureHeader || 'X-Flashbots-Signature'
+
+    return new FlashbotsBundleProvider(genericProvider, authSigner, connectionInfo, networkish, signatureHeader)
   }
 
   static getMaxBaseFeeInFutureBlock(baseFee: BigNumber, blocksInFuture: number): BigNumber {
@@ -903,7 +907,7 @@ export class FlashbotsBundleProvider extends providers.JsonRpcProvider {
   private async request(request: string) {
     const connectionInfo = { ...this.connectionInfo }
     connectionInfo.headers = {
-      [this.connectionInfo.signatureHeader]: `${await this.authSigner.getAddress()}:${await this.authSigner.signMessage(id(request))}`,
+      [this.signatureHeader]: `${await this.authSigner.getAddress()}:${await this.authSigner.signMessage(id(request))}`,
       ...this.connectionInfo.headers
     }
     return fetchJson(connectionInfo, request)
